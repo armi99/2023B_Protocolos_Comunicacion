@@ -8,6 +8,17 @@
 #ifndef CAN_H_
 #define CAN_H_
 
+
+////////////////////////////////////////////////////////////////////////////
+//                                                                        //
+//                             HEADER FILES                               //
+//                                                                        //
+////////////////////////////////////////////////////////////////////////////
+#include "Can_Cfg.h"
+#include "Can_GeneralTypes.h"
+#include "ComStack_Types.h"
+
+
 /*
  * Copyright (c) 2015, Freescale Semiconductor, Inc.
  * Copyright 2016-2021 NXP

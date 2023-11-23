@@ -5,7 +5,20 @@
  *      Author: Alberto Briseno
  */
 
+////////////////////////////////////////////////////////////////////////////
+//                                                                        //
+//                             HEADER FILES                               //
+//                                                                        //
+////////////////////////////////////////////////////////////////////////////
 #include "Can.h"
+#include "Dem.h"
+#include "Det.h"
+#include "MemMap.h"
+#include "SchM_Can.h"
+#include "Spi.h"
+#include "Os.h"
+#include "EcuM_Cbk.h"
+#include "CanIf_Cbk.h"
 
 
 /*
