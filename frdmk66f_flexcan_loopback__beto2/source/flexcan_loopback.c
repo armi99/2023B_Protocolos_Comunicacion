@@ -74,6 +74,8 @@ int main(void)
 {
     flexcan_config_t flexcanConfig;
     flexcan_rx_mb_config_t mbConfig;
+
+    Can_ConfigType  canConfig;
 #if (defined(FSL_FEATURE_FLEXCAN_HAS_EXTENDED_FLAG_REGISTER)) && (FSL_FEATURE_FLEXCAN_HAS_EXTENDED_FLAG_REGISTER > 0)
     uint64_t flag = 1U;
 #else
@@ -140,7 +142,14 @@ int main(void)
 #if (defined(USE_CANFD) && USE_CANFD)
     FLEXCAN_FDInit(EXAMPLE_CAN, &flexcanConfig, EXAMPLE_CAN_CLK_FREQ, BYTES_IN_MB, true);
 #else
-    FLEXCAN_Init(EXAMPLE_CAN, &flexcanConfig, EXAMPLE_CAN_CLK_FREQ);
+
+    //Set the values of canConfig
+    canConfig.base = EXAMPLE_CAN;
+    canConfig.pConfig = &flexcanConfig;
+    canConfig.sourceClock_Hz = EXAMPLE_CAN_CLK_FREQ;
+
+    Can_Init(&canConfig);
+
 #endif
 
     /* Setup Rx Message Buffer. */

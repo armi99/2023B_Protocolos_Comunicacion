@@ -602,6 +602,10 @@ typedef enum _flexcan_byte_error_syndrome
     kFLEXCAN_NonCorrectableErrors    /*!< Non-correctable error in this byte. */
 } flexcan_byte_error_syndrome_t;
 
+
+
+
+
 /*!
  * @brief FlexCAN memory error register status structure
  *
@@ -2210,6 +2214,38 @@ void FLEXCAN_TransferAbortReceiveEnhancedFifo(CAN_Type *base, flexcan_handle_t *
 void FLEXCAN_TransferHandleIRQ(CAN_Type *base, flexcan_handle_t *handle);
 
 /* @} */
+
+///////////////////////////////
+//                           //
+//      AGMI's refactor      //
+//                           //
+///////////////////////////////
+
+/*!
+ * @brief Contains the overall initialization data. Satisfies [SWS_Can_00413]
+ */
+typedef struct _Can_ConfigType
+{
+	CAN_Type *base;
+	const flexcan_config_t *pConfig;
+	uint32_t sourceClock_Hz;
+
+}Can_ConfigType;
+
+/*!
+ *brief Initialized Can Module
+ *
+ *AGMI's function
+ *This function initialized the CAN module.
+ *Satisfies [SWS_Can_00223] Requirement
+ *endcode
+ */
+void Can_Init(const Can_ConfigType* Config);
+///////////////////////////////
+//                           //
+//        AGMI's END         //
+//                           //
+///////////////////////////////
 
 #if defined(__cplusplus)
 }

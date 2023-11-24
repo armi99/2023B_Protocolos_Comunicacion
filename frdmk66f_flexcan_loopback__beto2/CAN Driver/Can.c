@@ -895,6 +895,138 @@ static void FLEXCAN_SetFDBitRate(CAN_Type *base,
 #endif
 
 /*!
+ *brief Initialized Can Module
+ *
+ *AGMI's function
+ *This function initialized the CAN module.
+ *Satisfies [SWS_Can_00223] Requirement
+ *endcode
+ */
+void Can_Init(const Can_ConfigType* Config){
+	/* Assertion. */
+	assert(NULL != (Config->pConfig));
+	assert(((Config->pConfig)->maxMbNum > 0U) &&
+		   ((Config->pConfig)->maxMbNum <= (uint8_t)FSL_FEATURE_FLEXCAN_HAS_MESSAGE_BUFFER_MAX_NUMBERn((Config->base))));
+	assert((Config->pConfig)->bitRate > 0U);
+
+	uint32_t mcrTemp;
+	uint32_t ctrl1Temp;
+#if !(defined(FSL_SDK_DISABLE_DRIVER_CLOCK_CONTROL) && FSL_SDK_DISABLE_DRIVER_CLOCK_CONTROL)
+	uint32_t instance;
+#endif
+
+#if !(defined(FSL_SDK_DISABLE_DRIVER_CLOCK_CONTROL) && FSL_SDK_DISABLE_DRIVER_CLOCK_CONTROL)
+	instance = FLEXCAN_GetInstance((Config->base));
+	/* Enable FlexCAN clock. */
+	(void)CLOCK_EnableClock(s_flexcanClock[instance]);
+	/*
+	 * Check the CAN clock in this device whether affected by Other clock gate
+	 * If it affected, we'd better to change other clock source,
+	 * If user insist on using that clock source, user need open these gate at same time,
+	 * In this scene, User need to care the power consumption.
+	 */
+	assert(CAN_CLOCK_CHECK_NO_AFFECTS);
+#if defined(FLEXCAN_PERIPH_CLOCKS)
+	/* Enable FlexCAN serial clock. */
+	(void)CLOCK_EnableClock(s_flexcanPeriphClock[instance]);
+#endif /* FLEXCAN_PERIPH_CLOCKS */
+#endif /* FSL_SDK_DISABLE_DRIVER_CLOCK_CONTROL */
+
+#if defined(CAN_CTRL1_CLKSRC_MASK)
+#if (defined(FSL_FEATURE_FLEXCAN_SUPPORT_ENGINE_CLK_SEL_REMOVE) && FSL_FEATURE_FLEXCAN_SUPPORT_ENGINE_CLK_SEL_REMOVE)
+	if (0 == FSL_FEATURE_FLEXCAN_INSTANCE_SUPPORT_ENGINE_CLK_SEL_REMOVEn((Config->base)))
+#endif /* FSL_FEATURE_FLEXCAN_SUPPORT_ENGINE_CLK_SEL_REMOVE */
+	{
+		/* Disable FlexCAN Module. */
+		FLEXCAN_Enable((Config->base), false);
+
+		/* Protocol-Engine clock source selection, This bit must be set
+		 * when FlexCAN Module in Disable Mode.
+		 */
+		(Config->base)->CTRL1 = (kFLEXCAN_ClkSrc0 == (Config->pConfig)->clkSrc) ? ((Config->base)->CTRL1 & ~CAN_CTRL1_CLKSRC_MASK) :
+															  ((Config->base)->CTRL1 | CAN_CTRL1_CLKSRC_MASK);
+	}
+#endif /* CAN_CTRL1_CLKSRC_MASK */
+
+	/* Enable FlexCAN Module for configuration. */
+	FLEXCAN_Enable((Config->base), true);
+
+	/* Reset to known status. */
+	FLEXCAN_Reset((Config->base));
+
+#if (defined(FSL_FEATURE_FLEXCAN_HAS_MEMORY_ERROR_CONTROL) && FSL_FEATURE_FLEXCAN_HAS_MEMORY_ERROR_CONTROL)
+	/* Enable to update in MCER. */
+	(Config->base)->CTRL2 |= CAN_CTRL2_ECRWRE_MASK;
+	(Config->base)->MECR &= ~CAN_MECR_ECRWRDIS_MASK;
+
+	/* Enable/Disable Memory Error Detection and Correction.*/
+	(Config->base)->MECR = ((Config->pConfig)->enableMemoryErrorControl) ? ((Config->base)->MECR & ~CAN_MECR_ECCDIS_MASK) :
+													   ((Config->base)->MECR | CAN_MECR_ECCDIS_MASK);
+
+	/* Enable/Disable Non-Correctable Errors In FlexCAN Access Put Device In Freeze Mode. */
+	(Config->base)->MECR = ((Config->pConfig)->enableNonCorrectableErrorEnterFreeze) ? ((Config->base)->MECR | CAN_MECR_NCEFAFRZ_MASK) :
+																   ((Config->base)->MECR & ~CAN_MECR_NCEFAFRZ_MASK);
+	/* Lock MCER register. */
+	(Config->base)->CTRL2 &= ~CAN_CTRL2_ECRWRE_MASK;
+#endif
+
+	/* Save current CTRL1 value and enable to enter Freeze mode(enabled by default). */
+	ctrl1Temp = (Config->base)->CTRL1;
+
+	/* Save current MCR value and enable to enter Freeze mode(enabled by default). */
+	mcrTemp = (Config->base)->MCR;
+
+	/* Enable Loop Back Mode? */
+	ctrl1Temp = ((Config->pConfig)->enableLoopBack) ? (ctrl1Temp | CAN_CTRL1_LPB_MASK) : (ctrl1Temp & ~CAN_CTRL1_LPB_MASK);
+
+	/* Enable Timer Sync? */
+	ctrl1Temp = ((Config->pConfig)->enableTimerSync) ? (ctrl1Temp | CAN_CTRL1_TSYN_MASK) : (ctrl1Temp & ~CAN_CTRL1_TSYN_MASK);
+
+	/* Enable Listen Only Mode? */
+	ctrl1Temp = ((Config->pConfig)->enableListenOnlyMode) ? ctrl1Temp | CAN_CTRL1_LOM_MASK : ctrl1Temp & ~CAN_CTRL1_LOM_MASK;
+
+#if !(defined(FSL_FEATURE_FLEXCAN_HAS_NO_SUPV_SUPPORT) && FSL_FEATURE_FLEXCAN_HAS_NO_SUPV_SUPPORT)
+	/* Enable Supervisor Mode? */
+	mcrTemp = ((Config->pConfig)->enableSupervisorMode) ? mcrTemp | CAN_MCR_SUPV_MASK : mcrTemp & ~CAN_MCR_SUPV_MASK;
+#endif
+
+	/* Set the maximum number of Message Buffers */
+	mcrTemp = (mcrTemp & ~CAN_MCR_MAXMB_MASK) | CAN_MCR_MAXMB((uint32_t)(Config->pConfig)->maxMbNum - 1U);
+
+	/* Enable Self Wake Up Mode and configure the wake up source. */
+	mcrTemp = ((Config->pConfig)->enableSelfWakeup) ? (mcrTemp | CAN_MCR_SLFWAK_MASK) : (mcrTemp & ~CAN_MCR_SLFWAK_MASK);
+	mcrTemp = (kFLEXCAN_WakeupSrcFiltered == (Config->pConfig)->wakeupSrc) ? (mcrTemp | CAN_MCR_WAKSRC_MASK) :
+																   (mcrTemp & ~CAN_MCR_WAKSRC_MASK);
+#if (defined(FSL_FEATURE_FLEXCAN_HAS_PN_MODE) && FSL_FEATURE_FLEXCAN_HAS_PN_MODE)
+	/* Enable Pretended Networking Mode? When Pretended Networking mode is set, Self Wake Up feature must be disabled.*/
+	mcrTemp = ((Config->pConfig)->enablePretendedeNetworking) ? ((mcrTemp & ~CAN_MCR_SLFWAK_MASK) | CAN_MCR_PNET_EN_MASK) :
+													  (mcrTemp & ~CAN_MCR_PNET_EN_MASK);
+#endif
+
+	/* Enable Individual Rx Masking and Queue feature? */
+	mcrTemp = ((Config->pConfig)->enableIndividMask) ? (mcrTemp | CAN_MCR_IRMQ_MASK) : (mcrTemp & ~CAN_MCR_IRMQ_MASK);
+
+	/* Disable Self Reception? */
+	mcrTemp = ((Config->pConfig)->disableSelfReception) ? mcrTemp | CAN_MCR_SRXDIS_MASK : mcrTemp & ~CAN_MCR_SRXDIS_MASK;
+
+#if (defined(FSL_FEATURE_FLEXCAN_HAS_DOZE_MODE_SUPPORT) && FSL_FEATURE_FLEXCAN_HAS_DOZE_MODE_SUPPORT)
+	if (0 != FSL_FEATURE_FLEXCAN_INSTANCE_HAS_DOZE_MODE_SUPPORTn((Config->base)))
+	{
+		/* Enable Doze Mode? */
+		mcrTemp = ((Config->pConfig)->enableDoze) ? (mcrTemp | CAN_MCR_DOZE_MASK) : (mcrTemp & ~CAN_MCR_DOZE_MASK);
+	}
+#endif
+
+	/* Write back CTRL1 Configuration to register. */
+	(Config->base)->CTRL1 = ctrl1Temp;
+
+	/* Write back MCR Configuration to register. */
+	(Config->base)->MCR = mcrTemp;
+
+	/* Bit Rate Configuration.*/
+	FLEXCAN_SetBitRate((Config->base), (Config->sourceClock_Hz), (Config->pConfig)->bitRate, (Config->pConfig)->timingConfig);
+}
+/*!
  * brief Initializes a FlexCAN instance.
  *
  * This function initializes the FlexCAN module with user-defined settings.
@@ -919,131 +1051,6 @@ static void FLEXCAN_SetFDBitRate(CAN_Type *base,
  * param pConfig Pointer to the user-defined configuration structure.
  * param sourceClock_Hz FlexCAN Protocol Engine clock source frequency in Hz.
  */
-void FLEXCAN_Init(CAN_Type *base, const flexcan_config_t *pConfig, uint32_t sourceClock_Hz)
-{
-    /* Assertion. */
-    assert(NULL != pConfig);
-    assert((pConfig->maxMbNum > 0U) &&
-           (pConfig->maxMbNum <= (uint8_t)FSL_FEATURE_FLEXCAN_HAS_MESSAGE_BUFFER_MAX_NUMBERn(base)));
-    assert(pConfig->bitRate > 0U);
-
-    uint32_t mcrTemp;
-    uint32_t ctrl1Temp;
-#if !(defined(FSL_SDK_DISABLE_DRIVER_CLOCK_CONTROL) && FSL_SDK_DISABLE_DRIVER_CLOCK_CONTROL)
-    uint32_t instance;
-#endif
-
-#if !(defined(FSL_SDK_DISABLE_DRIVER_CLOCK_CONTROL) && FSL_SDK_DISABLE_DRIVER_CLOCK_CONTROL)
-    instance = FLEXCAN_GetInstance(base);
-    /* Enable FlexCAN clock. */
-    (void)CLOCK_EnableClock(s_flexcanClock[instance]);
-    /*
-     * Check the CAN clock in this device whether affected by Other clock gate
-     * If it affected, we'd better to change other clock source,
-     * If user insist on using that clock source, user need open these gate at same time,
-     * In this scene, User need to care the power consumption.
-     */
-    assert(CAN_CLOCK_CHECK_NO_AFFECTS);
-#if defined(FLEXCAN_PERIPH_CLOCKS)
-    /* Enable FlexCAN serial clock. */
-    (void)CLOCK_EnableClock(s_flexcanPeriphClock[instance]);
-#endif /* FLEXCAN_PERIPH_CLOCKS */
-#endif /* FSL_SDK_DISABLE_DRIVER_CLOCK_CONTROL */
-
-#if defined(CAN_CTRL1_CLKSRC_MASK)
-#if (defined(FSL_FEATURE_FLEXCAN_SUPPORT_ENGINE_CLK_SEL_REMOVE) && FSL_FEATURE_FLEXCAN_SUPPORT_ENGINE_CLK_SEL_REMOVE)
-    if (0 == FSL_FEATURE_FLEXCAN_INSTANCE_SUPPORT_ENGINE_CLK_SEL_REMOVEn(base))
-#endif /* FSL_FEATURE_FLEXCAN_SUPPORT_ENGINE_CLK_SEL_REMOVE */
-    {
-        /* Disable FlexCAN Module. */
-        FLEXCAN_Enable(base, false);
-
-        /* Protocol-Engine clock source selection, This bit must be set
-         * when FlexCAN Module in Disable Mode.
-         */
-        base->CTRL1 = (kFLEXCAN_ClkSrc0 == pConfig->clkSrc) ? (base->CTRL1 & ~CAN_CTRL1_CLKSRC_MASK) :
-                                                              (base->CTRL1 | CAN_CTRL1_CLKSRC_MASK);
-    }
-#endif /* CAN_CTRL1_CLKSRC_MASK */
-
-    /* Enable FlexCAN Module for configuration. */
-    FLEXCAN_Enable(base, true);
-
-    /* Reset to known status. */
-    FLEXCAN_Reset(base);
-
-#if (defined(FSL_FEATURE_FLEXCAN_HAS_MEMORY_ERROR_CONTROL) && FSL_FEATURE_FLEXCAN_HAS_MEMORY_ERROR_CONTROL)
-    /* Enable to update in MCER. */
-    base->CTRL2 |= CAN_CTRL2_ECRWRE_MASK;
-    base->MECR &= ~CAN_MECR_ECRWRDIS_MASK;
-
-    /* Enable/Disable Memory Error Detection and Correction.*/
-    base->MECR = (pConfig->enableMemoryErrorControl) ? (base->MECR & ~CAN_MECR_ECCDIS_MASK) :
-                                                       (base->MECR | CAN_MECR_ECCDIS_MASK);
-
-    /* Enable/Disable Non-Correctable Errors In FlexCAN Access Put Device In Freeze Mode. */
-    base->MECR = (pConfig->enableNonCorrectableErrorEnterFreeze) ? (base->MECR | CAN_MECR_NCEFAFRZ_MASK) :
-                                                                   (base->MECR & ~CAN_MECR_NCEFAFRZ_MASK);
-    /* Lock MCER register. */
-    base->CTRL2 &= ~CAN_CTRL2_ECRWRE_MASK;
-#endif
-
-    /* Save current CTRL1 value and enable to enter Freeze mode(enabled by default). */
-    ctrl1Temp = base->CTRL1;
-
-    /* Save current MCR value and enable to enter Freeze mode(enabled by default). */
-    mcrTemp = base->MCR;
-
-    /* Enable Loop Back Mode? */
-    ctrl1Temp = (pConfig->enableLoopBack) ? (ctrl1Temp | CAN_CTRL1_LPB_MASK) : (ctrl1Temp & ~CAN_CTRL1_LPB_MASK);
-
-    /* Enable Timer Sync? */
-    ctrl1Temp = (pConfig->enableTimerSync) ? (ctrl1Temp | CAN_CTRL1_TSYN_MASK) : (ctrl1Temp & ~CAN_CTRL1_TSYN_MASK);
-
-    /* Enable Listen Only Mode? */
-    ctrl1Temp = (pConfig->enableListenOnlyMode) ? ctrl1Temp | CAN_CTRL1_LOM_MASK : ctrl1Temp & ~CAN_CTRL1_LOM_MASK;
-
-#if !(defined(FSL_FEATURE_FLEXCAN_HAS_NO_SUPV_SUPPORT) && FSL_FEATURE_FLEXCAN_HAS_NO_SUPV_SUPPORT)
-    /* Enable Supervisor Mode? */
-    mcrTemp = (pConfig->enableSupervisorMode) ? mcrTemp | CAN_MCR_SUPV_MASK : mcrTemp & ~CAN_MCR_SUPV_MASK;
-#endif
-
-    /* Set the maximum number of Message Buffers */
-    mcrTemp = (mcrTemp & ~CAN_MCR_MAXMB_MASK) | CAN_MCR_MAXMB((uint32_t)pConfig->maxMbNum - 1U);
-
-    /* Enable Self Wake Up Mode and configure the wake up source. */
-    mcrTemp = (pConfig->enableSelfWakeup) ? (mcrTemp | CAN_MCR_SLFWAK_MASK) : (mcrTemp & ~CAN_MCR_SLFWAK_MASK);
-    mcrTemp = (kFLEXCAN_WakeupSrcFiltered == pConfig->wakeupSrc) ? (mcrTemp | CAN_MCR_WAKSRC_MASK) :
-                                                                   (mcrTemp & ~CAN_MCR_WAKSRC_MASK);
-#if (defined(FSL_FEATURE_FLEXCAN_HAS_PN_MODE) && FSL_FEATURE_FLEXCAN_HAS_PN_MODE)
-    /* Enable Pretended Networking Mode? When Pretended Networking mode is set, Self Wake Up feature must be disabled.*/
-    mcrTemp = (pConfig->enablePretendedeNetworking) ? ((mcrTemp & ~CAN_MCR_SLFWAK_MASK) | CAN_MCR_PNET_EN_MASK) :
-                                                      (mcrTemp & ~CAN_MCR_PNET_EN_MASK);
-#endif
-
-    /* Enable Individual Rx Masking and Queue feature? */
-    mcrTemp = (pConfig->enableIndividMask) ? (mcrTemp | CAN_MCR_IRMQ_MASK) : (mcrTemp & ~CAN_MCR_IRMQ_MASK);
-
-    /* Disable Self Reception? */
-    mcrTemp = (pConfig->disableSelfReception) ? mcrTemp | CAN_MCR_SRXDIS_MASK : mcrTemp & ~CAN_MCR_SRXDIS_MASK;
-
-#if (defined(FSL_FEATURE_FLEXCAN_HAS_DOZE_MODE_SUPPORT) && FSL_FEATURE_FLEXCAN_HAS_DOZE_MODE_SUPPORT)
-    if (0 != FSL_FEATURE_FLEXCAN_INSTANCE_HAS_DOZE_MODE_SUPPORTn(base))
-    {
-        /* Enable Doze Mode? */
-        mcrTemp = (pConfig->enableDoze) ? (mcrTemp | CAN_MCR_DOZE_MASK) : (mcrTemp & ~CAN_MCR_DOZE_MASK);
-    }
-#endif
-
-    /* Write back CTRL1 Configuration to register. */
-    base->CTRL1 = ctrl1Temp;
-
-    /* Write back MCR Configuration to register. */
-    base->MCR = mcrTemp;
-
-    /* Bit Rate Configuration.*/
-    FLEXCAN_SetBitRate(base, sourceClock_Hz, pConfig->bitRate, pConfig->timingConfig);
-}
 
 #if (defined(FSL_FEATURE_FLEXCAN_HAS_FLEXIBLE_DATA_RATE) && FSL_FEATURE_FLEXCAN_HAS_FLEXIBLE_DATA_RATE)
 /*!
