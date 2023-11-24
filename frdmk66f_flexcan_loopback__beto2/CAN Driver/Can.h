@@ -2241,6 +2241,15 @@ typedef struct _Can_ConfigType
  *endcode
  */
 void Can_Init(const Can_ConfigType* Config);
+
+/*!
+ *brief Returnsthe version information of this module
+ *
+ *AGMI's function
+ *Satisfies [SWS_Can_00224] Requirement
+ *endcode
+ */
+void Can_GetVersionInfo(Std_VersionInfoType* versioninfo);
 ///////////////////////////////
 //                           //
 //        AGMI's END         //

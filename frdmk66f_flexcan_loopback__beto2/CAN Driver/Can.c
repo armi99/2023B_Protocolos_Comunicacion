@@ -1026,32 +1026,18 @@ void Can_Init(const Can_ConfigType* Config){
 	/* Bit Rate Configuration.*/
 	FLEXCAN_SetBitRate((Config->base), (Config->sourceClock_Hz), (Config->pConfig)->bitRate, (Config->pConfig)->timingConfig);
 }
-/*!
- * brief Initializes a FlexCAN instance.
- *
- * This function initializes the FlexCAN module with user-defined settings.
- * This example shows how to set up the flexcan_config_t parameters and how
- * to call the FLEXCAN_Init function by passing in these parameters.
- *  code
- *   flexcan_config_t flexcanConfig;
- *   flexcanConfig.clkSrc               = kFLEXCAN_ClkSrc0;
- *   flexcanConfig.bitRate              = 1000000U;
- *   flexcanConfig.maxMbNum             = 16;
- *   flexcanConfig.enableLoopBack       = false;
- *   flexcanConfig.enableSelfWakeup     = false;
- *   flexcanConfig.enableIndividMask    = false;
- *   flexcanConfig.disableSelfReception = false;
- *   flexcanConfig.enableListenOnlyMode = false;
- *   flexcanConfig.enableDoze           = false;
- *   flexcanConfig.timingConfig         = timingConfig;
- *   FLEXCAN_Init(CAN0, &flexcanConfig, 40000000UL);
- *   endcode
- *
- * param base FlexCAN peripheral base address.
- * param pConfig Pointer to the user-defined configuration structure.
- * param sourceClock_Hz FlexCAN Protocol Engine clock source frequency in Hz.
- */
 
+/*!
+ *brief Returnsthe version information of this module
+ *
+ *AGMI's function
+ *Satisfies [SWS_Can_00224] Requirement
+ *endcode
+ */
+void Can_GetVersionInfo(Std_VersionInfoType* versioninfo)
+{
+	//To do
+}
 #if (defined(FSL_FEATURE_FLEXCAN_HAS_FLEXIBLE_DATA_RATE) && FSL_FEATURE_FLEXCAN_HAS_FLEXIBLE_DATA_RATE)
 /*!
  * brief Initializes a FlexCAN instance.
